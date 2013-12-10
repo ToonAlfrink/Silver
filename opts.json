@@ -1,0 +1,13 @@
+{
+	"endpoint" : "filter",
+	"userstream" : {},
+	"firehose" : {},
+	"retweet" : {},
+	"sample" : {},
+	"filter" : {
+		 "track" : ["if","the","a","http","t","rt","be","to","of","and","in","that","i","it"],
+		 "locations" : null,
+		 "languages" : ["en"]}
+}
+		     
+	
