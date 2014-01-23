@@ -1,0 +1,11 @@
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Python
+*.pyc
+
+# Misc
+auth.txt
