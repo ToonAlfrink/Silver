@@ -3,8 +3,8 @@ import json
 import re
 from geldmachine.models import Word
 
-class Miner:
-    def __init__(self, authfile, optionsfile):
+class Miner(object):
+    def __init__(self, optionsfile, authfile):
         self._getstream(authfile)
         self._parseoptions(optionsfile)
         self._wordmanager = WordManager()
@@ -18,18 +18,17 @@ class Miner:
         self.stream = tweepy.Stream(auth_handler, listener)
 
     def _parseoptions(self, optionsfile):
-        data = json.load(open(optionsfile))
+        data = json.load(open(optionsfile, 'r'))
         endpoint = data['endpoint']
         self.options = data[endpoint]
         
     def run(self):
-        print(self.options)
         self.stream.filter(**self.options)
 
     def on_status(self, tweet):
         self.i += 1
         self._wordmanager.addline(tweet.text, tweet.created_at.date())
-        if self.i % 1000 == 0:
+        if self.i % 100 == 0:
             self._wordmanager.save()
 
 
@@ -47,7 +46,7 @@ class StreamListener(tweepy.StreamListener):
     def on_error(self, status_code):
         self.callback.on_error(status_code)
 
-class WordManager:
+class WordManager(object):
     _words = {}
     def addline(self, line, date):
         words = [w.lower() for w in re.findall("[\w]+", line)]        
@@ -70,9 +69,9 @@ class WordManager:
         tuples = self._tuples()
         print("saving {n} words".format(n = len(tuples)))
         for count, word, date in tuples:
-            w, created = Word.objects.get_or_create(word = word, date = date, defaults = {'count':0})
+            w, created = Word.objects.get_or_create(word = word, date = date, defaults = {'count':1})
             if created:
-                w.count = 0
+                w.count = 1
             else:
                 w.count += count
             w.save()
@@ -81,4 +80,7 @@ class WordManager:
 
 if __name__ == "__main__":
     from sys import argv
-    Miner(argv[1], argv[2]).run()
+    if not len(argv) == 3:
+        print("please provide an options (json) file and an auth (txt) file")
+    else:
+        Miner(argv[1], argv[2]).run()
