@@ -5,7 +5,7 @@
 	"retweet" : {},
 	"sample" : {},
 	"filter" : {
-		 "track" : ["if","the","a","http","t","rt","be","to","of","and","in","that","i","it"],
+		 "track" : ["i'm","i feel","i am feeling","i'm feeling","i don't feel","i dont feel","im","i am","makes me","doesn't make me","doesnt make me"],
 		 "locations" : null,
 		 "languages" : ["en"]}
 }

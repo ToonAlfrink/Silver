@@ -2,12 +2,13 @@ import tweepy
 import json
 import re
 from geldmachine.models import Word
+from datetime import date
 
 class Miner(object):
     def __init__(self, optionsfile, authfile):
         self._getstream(authfile)
         self._parseoptions(optionsfile)
-        self._wordmanager = WordManager()
+        self._processor = Processor()
         self.i = 0
 
     def _getstream(self, authfile):
@@ -23,14 +24,18 @@ class Miner(object):
         self.options = data[endpoint]
         
     def run(self):
-        self.stream.filter(**self.options)
+        from time import sleep
+        while True:
+            try:
+                self.stream.filter(**self.options)
+            except Exception as e:
+                sleep(5)
 
     def on_status(self, tweet):
         self.i += 1
-        self._wordmanager.addline(tweet.text, tweet.created_at.date())
-        if self.i % 100 == 0:
-            self._wordmanager.save()
-
+        self._processor.addtweet(tweet.text)
+        if self.i % 10000 == 0:
+            self._processor.save()
 
     def on_error(self, status_code):
         print(status_code)
@@ -46,37 +51,47 @@ class StreamListener(tweepy.StreamListener):
     def on_error(self, status_code):
         self.callback.on_error(status_code)
 
-class WordManager(object):
-    _words = {}
-    def addline(self, line, date):
-        words = [w.lower() for w in re.findall("[\w]+", line)]        
-        for w in words:
-            self.add(w, date)
 
-    def add(self, word, date):
-        if (word, date) in self._words.keys():
-            self._words[(word, date)] += 1
-        else:
-            self._words[(word, date)] = 1
-    
-    def _tuples(self):
-        return [(v, k[0], k[1]) for k, v in self._words.items()]
+positive_patterns = [r"(i'?m( feeling)?|i am( feeling)?|i feel|makes me)( kinda)? (\w+)"]
 
-    def top100(self):
-        return list(sorted(self._tuples()))[:100]
+negative_patterns = [r"(i'm|i am) not (\w+)",
+                     r"i don't feel (\w+)",
+                     r"doesn't make me (\w+)",
+                     r"im not (\w+)",
+                     r"i am not feeling (\w+)",
+                     r"im not feeling (\w+)",
+                     r"i'm not feeling (\w+)",]
+
+from collections import Counter
+from nltk import word_tokenize, pos_tag
+
+class Processor(object):
+    def __init__(self):
+        self.states = Counter()
+
+    def addtweet(self, text):
+        text = text.lower()
+        tags = dict(pos_tag(word_tokenize(text)))
+        for p in positive_patterns:
+            match = re.search(p, text)
+            if match and match.groups()[-1]:                
+                word = match.groups()[-1]
+                if tags.get(word) == "JJ":
+                    self.states[word] += 1
+        for p in negative_patterns:
+            match = re.search(p, text)
+            if match and match.groups()[-1]:
+                word = match.groups()[-1]
+                if tags.get(word) == "JJ":
+                    self.states["-"+word] += 1
 
     def save(self):
-        tuples = self._tuples()
-        print("saving {n} words".format(n = len(tuples)))
-        for count, word, date in tuples:
-            w, created = Word.objects.get_or_create(word = word, date = date, defaults = {'count':1})
-            if created:
-                w.count = 1
-            else:
-                w.count += count
-            w.save()
-
-        self._words = {}
+        print(self.states)
+        for word, count in self.states.items():
+            w_model = Word.objects.get_or_create(word = word, date = date.today(),defaults={'count':0})[0]
+            w_model.count += count
+            w_model.save()
+        self.states = Counter()
 
 if __name__ == "__main__":
     from sys import argv
